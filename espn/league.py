@@ -1,4 +1,4 @@
-import urllib.request
+import requests
 import logging
 import json
 from typing import Optional, List, Dict, Any
@@ -25,20 +25,21 @@ class League:
     """
 
     @staticmethod
-    def _request_json(url):
+    def _request_json(url, cookies={}):
         try:
-            res = urllib.request.urlopen(url)
-            raw = res.read()
-            return json.loads(raw.decode())
-        except urllib.request.URLError:
+            r = requests.get(url, cookies=cookies)
+            return r.json()
+        except requests.ConnectionError:
             return None
 
     def __init__(
         self,
         league_id: int,
         season: Optional[int] = None,
+        cookies: Optional[dict] = {},
         cache: Optional[Cache] = None,
     ) -> None:
+        self._cookies = cookies
         if cache:
             self.cache = cache
             self.cache.set_league(self)
@@ -110,7 +111,9 @@ class League:
     @cache_operation
     def _get_league_data(self):
         logging.info("Requesting league settings from ESPN for %d." % self.league_id)
-        data = self._request_json(self._endpoint.format(self.season, self.league_id))
+        data = self._request_json(
+            self._endpoint.format(self.season, self.league_id), cookies=self._cookies
+        )
         if data is None:
             raise ValueError("That league is not publicly accessible.")
         return data
@@ -123,7 +126,7 @@ class League:
         )
         url = self._endpoint.format(self.season, self.league_id)
         url += f"&scoringPeriodId={scoring_period}"
-        data = self._request_json(url)
+        data = self._request_json(url, cookies=self._cookies)
         if data is None:
             raise RuntimeError("Failed to request scoring period data.")
         return data
